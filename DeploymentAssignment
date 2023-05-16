@@ -1,0 +1,5 @@
+WE can upgrade the container using the below command
+
+Intial image was deployed with luksa/kubia:v1
+
+We can update - kubectl set image deployment kubia nodejs=luksa/kubia:v2
