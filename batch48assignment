@@ -1,0 +1,301 @@
+||||Assignment for Voting application||||
+
+[root@ip-172-31-17-193 k8s-specifications]# cat vote-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vote
+spec:
+  type: NodePort
+  ports:
+  - name: "vote-service"
+    port: 5000
+    targetPort: 80
+    nodePort: 31004
+  selector:
+    app: vote
+
+[root@ip-172-31-17-193 k8s-specifications]# cat result-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: result
+spec:
+  type: NodePort
+  ports:
+  - name: "result-service"
+    port: 5001
+    targetPort: 80
+    nodePort: 31005
+  selector:
+    app: result
+[root@ip-172-31-17-193 k8s-specifications]#
+
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl apply -f .
+deployment.apps/db created
+service/db created
+deployment.apps/redis created
+service/redis created
+deployment.apps/result created
+service/result created
+deployment.apps/vote created
+service/vote created
+deployment.apps/worker created
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get all -o wide
+NAME                          READY   STATUS    RESTARTS   AGE   IP                NODE                                               NOMINATED NODE   READINESS GATES
+pod/db-b54cd94f4-5nhxv        1/1     Running   0          51s   192.168.206.143   ip-172-31-17-193.ap-southeast-1.compute.internal   <none>           <none>
+pod/redis-868d64d78-q8lbf     1/1     Running   0          51s   192.168.206.159   ip-172-31-17-193.ap-southeast-1.compute.internal   <none>           <none>
+pod/result-5d57b59f4b-lxgcx   1/1     Running   0          51s   192.168.206.157   ip-172-31-17-193.ap-southeast-1.compute.internal   <none>           <none>
+pod/vote-94849dc97-8bptn      1/1     Running   0          50s   192.168.206.136   ip-172-31-17-193.ap-southeast-1.compute.internal   <none>           <none>
+pod/worker-dd46d7584-65px6    1/1     Running   0          50s   192.168.206.155   ip-172-31-17-193.ap-southeast-1.compute.internal   <none>           <none>
+
+NAME             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+service/db       ClusterIP   10.107.90.142    <none>        5432/TCP         51s   app=db
+service/redis    ClusterIP   10.104.79.146    <none>        6379/TCP         51s   app=redis
+service/result   NodePort    10.96.36.66      <none>        5001:31005/TCP   50s   app=result
+service/vote     NodePort    10.109.184.128   <none>        5000:31004/TCP   50s   app=vote
+
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                         SELECTOR
+deployment.apps/db       1/1     1            1           51s   db           postgres:9.3                                   app=db
+deployment.apps/redis    1/1     1            1           51s   redis        redis:alpine                                   app=redis
+deployment.apps/result   1/1     1            1           51s   result       dockersamples/examplevotingapp_result:before   app=result
+deployment.apps/vote     1/1     1            1           50s   vote         dockersamples/examplevotingapp_vote:before     app=vote
+deployment.apps/worker   1/1     1            1           50s   worker       dockersamples/examplevotingapp_worker          app=worker
+
+NAME                                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                         SELECTOR
+replicaset.apps/db-b54cd94f4        1         1         1       51s   db           postgres:9.3                                   app=db,pod-template-hash=b54cd94f4
+replicaset.apps/redis-868d64d78     1         1         1       51s   redis        redis:alpine                                   app=redis,pod-template-hash=868d64d78
+replicaset.apps/result-5d57b59f4b   1         1         1       51s   result       dockersamples/examplevotingapp_result:before   app=result,pod-template-hash=5d57b59f4b
+replicaset.apps/vote-94849dc97      1         1         1       50s   vote         dockersamples/examplevotingapp_vote:before     app=vote,pod-template-hash=94849dc97
+replicaset.apps/worker-dd46d7584    1         1         1       50s   worker       dockersamples/examplevotingapp_worker          app=worker,pod-template-hash=dd46d7584
+[root@ip-172-31-17-193 k8s-specifications]#
+
+
+
+"☝️ Delete them in same order 
+1st ► VOTE pod ► Observe what happens both in frontEnd & in Unix
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-5nhxv        1/1     Running   0          4m41s
+redis-868d64d78-q8lbf     1/1     Running   0          4m41s
+result-5d57b59f4b-lxgcx   1/1     Running   0          4m41s
+vote-94849dc97-8bptn      1/1     Running   0          4m40s
+worker-dd46d7584-65px6    1/1     Running   0          4m40s
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl delete pod vote-94849dc97-8bptn
+pod "vote-94849dc97-8bptn" deleted
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-5nhxv        1/1     Running   0          5m7s
+redis-868d64d78-q8lbf     1/1     Running   0          5m7s
+result-5d57b59f4b-lxgcx   1/1     Running   0          5m7s
+vote-94849dc97-9kvvg      1/1     Running   0          17s
+worker-dd46d7584-65px6    1/1     Running   0          5m6s
+[root@ip-172-31-17-193 k8s-specifications]#
+
+OBSERVATION>> Once the vote pod is deleted using above command, a new vote pod will get spwaned and as a end user, I did not notice any issues in voting page. I could still vote without refreshing the browser and the result page displayed correct result.
+
+
+
+2nd ► WORKER pod  ► Observe what happens both in frontEnd & in Unix
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-5nhxv        1/1     Running   0          13m
+redis-868d64d78-q8lbf     1/1     Running   0          13m
+result-5d57b59f4b-lxgcx   1/1     Running   0          13m
+vote-94849dc97-rwl9p      1/1     Running   0          6m8s
+worker-dd46d7584-65px6    1/1     Running   0          13m
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl delete pod worker-dd46d7584-65px6
+pod "worker-dd46d7584-65px6" deleted
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pod
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-5nhxv        1/1     Running   0          14m
+redis-868d64d78-q8lbf     1/1     Running   0          14m
+result-5d57b59f4b-lxgcx   1/1     Running   0          14m
+vote-94849dc97-rwl9p      1/1     Running   0          7m6s
+worker-dd46d7584-rbwjg    1/1     Running   0          29s
+[root@ip-172-31-17-193 k8s-specifications]#
+
+OBSERVATION>>Once the worker pod is deleted using above command, a new worker pod will get spwaned and as a end user, I did not notice any issues in voting page. But I noticed a little delay observed in displaying the result (for 1 to 2 seconds). Once new pod is created, makes connection to both DB and REDIS.
+
+3rd ► DB pod ► Observe what happens both in frontEnd & in Unix"
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-5nhxv        1/1     Running   0          19m
+redis-868d64d78-q8lbf     1/1     Running   0          19m
+result-5d57b59f4b-lxgcx   1/1     Running   0          19m
+vote-94849dc97-rwl9p      1/1     Running   0          12m
+worker-dd46d7584-rbwjg    1/1     Running   0          5m33s
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl delete pod db-b54cd94f4-5nhxv
+pod "db-b54cd94f4-5nhxv" deleted
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-8j5vn        1/1     Running   0          45s
+redis-868d64d78-q8lbf     1/1     Running   0          22m
+result-5d57b59f4b-lxgcx   1/1     Running   1          22m
+vote-94849dc97-rwl9p      1/1     Running   0          15m
+worker-dd46d7584-rbwjg    1/1     Running   1          9m8s
+[root@ip-172-31-17-193 k8s-specifications]#
+
+OBSERVATION>> Once the db pod is deleted using above command, a new db pod will get spwaned and as a end user, i did not notice any issues in voting and result app. Voting and result operations worked fine. 
+Also I can see restart count 1 increased for both result and worker nodes. 
+DB services were shutdown and started once the new pod got created.
+
+
+//kubectl Logs:
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs vote-94849dc97-rwl9p|grep INFO|head -10
+[2023-05-16 10:32:09 +0000] [1] [INFO] Starting gunicorn 20.1.0
+[2023-05-16 10:32:09 +0000] [1] [INFO] Listening at: http://0.0.0.0:80 (1)
+[2023-05-16 10:32:09 +0000] [1] [INFO] Using worker: sync
+[2023-05-16 10:32:09 +0000] [7] [INFO] Booting worker with pid: 7
+[2023-05-16 10:32:09 +0000] [8] [INFO] Booting worker with pid: 8
+[2023-05-16 10:32:09 +0000] [9] [INFO] Booting worker with pid: 9
+[2023-05-16 10:32:09 +0000] [10] [INFO] Booting worker with pid: 10
+[2023-05-16 10:32:15,320] INFO in app: Received vote for b
+[2023-05-16 10:32:15 +0000] [9] [INFO] Received vote for b
+[2023-05-16 10:32:22,423] INFO in app: Received vote for a
+[root@ip-172-31-17-193 k8s-specifications]#
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs redis-868d64d78-q8lbf
+1:C 16 May 2023 10:25:12.928 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+1:C 16 May 2023 10:25:12.929 # Redis version=7.0.11, bits=64, commit=00000000, modified=0, pid=1, just started
+1:C 16 May 2023 10:25:12.929 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+1:M 16 May 2023 10:25:12.929 * monotonic clock: POSIX clock_gettime
+1:M 16 May 2023 10:25:12.930 * Running mode=standalone, port=6379.
+1:M 16 May 2023 10:25:12.930 # Server initialized
+1:M 16 May 2023 10:25:12.934 # WARNING Your system is configured to use the 'xen' clocksource which might lead to degraded performance. Check the result of the [slow-clocksource] system check: run 'redis-server --check-system' to check if the system's clocksource isn't degrading performance.
+1:M 16 May 2023 10:25:12.934 * Ready to accept connections
+[root@ip-172-31-17-193 k8s-specifications]#
+
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs worker-dd46d7584-rbwjg
+Connected to db
+Found redis at 10.104.79.146
+Connecting to redis
+[root@ip-172-31-17-193 k8s-specifications]#
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs worker-dd46d7584-rbwjg
+Connected to db
+Found redis at 10.104.79.146
+Connecting to redis
+[root@ip-172-31-17-193 k8s-specifications]#
+[root@ip-172-31-17-193 k8s-specifications]# kubectl get pods
+NAME                      READY   STATUS    RESTARTS   AGE
+db-b54cd94f4-8j5vn        1/1     Running   0          8m8s
+redis-868d64d78-q8lbf     1/1     Running   0          30m
+result-5d57b59f4b-lxgcx   1/1     Running   1          30m
+vote-94849dc97-rwl9p      1/1     Running   0          23m
+worker-dd46d7584-rbwjg    1/1     Running   1          16m
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs db-b54cd94f4-8j5vn
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+fixing permissions on existing directory /var/lib/postgresql/data ... ok
+creating subdirectories ... ok
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+creating configuration files ... ok
+creating template1 database in /var/lib/postgresql/data/base/1 ... ok
+initializing pg_authid ... ok
+setting password ... ok
+initializing dependencies ... ok
+creating system views ... ok
+loading system objects' descriptions ... ok
+creating collations ... ok
+creating conversions ... ok
+creating dictionaries ... ok
+setting privileges on built-in objects ... ok
+creating information schema ... ok
+loading PL/pgSQL server-side language ... ok
+vacuuming database template1 ... ok
+copying template1 to template0 ... ok
+copying template1 to postgres ... ok
+syncing data to disk ... ok
+
+WARNING: enabling "trust" authentication for local connections
+You can change this by editing pg_hba.conf or using the option -A, or
+--auth-local and --auth-host, the next time you run initdb.
+
+Success. You can now start the database server using:
+
+    postgres -D /var/lib/postgresql/data
+or
+    pg_ctl -D /var/lib/postgresql/data -l logfile start
+
+****************************************************
+WARNING: No password has been set for the database.
+         This will allow anyone with access to the
+         Postgres port to access your database. In
+         Docker's default configuration, this is
+         effectively any other container on the same
+         system.
+
+         Use "-e POSTGRES_PASSWORD=password" to set
+         it in "docker run".
+****************************************************
+waiting for server to start....LOG:  database system was shut down at 2023-05-16 10:47:11 UTC
+LOG:  MultiXact member wraparound protections are now enabled
+LOG:  database system is ready to accept connections
+LOG:  autovacuum launcher started
+ done
+server started
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+LOG:  received fast shutdown request
+LOG:  aborting any active transactions
+LOG:  autovacuum launcher shutting down
+LOG:  shutting down
+waiting for server to shut down....LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+LOG:  database system was shut down at 2023-05-16 10:47:12 UTC
+LOG:  MultiXact member wraparound protections are now enabled
+LOG:  database system is ready to accept connections
+LOG:  autovacuum launcher started
+ERROR:  relation "votes" does not exist at character 38
+STATEMENT:  SELECT vote, COUNT(id) AS count FROM votes GROUP BY vote
+ERROR:  relation "votes" does not exist at character 38
+STATEMENT:  SELECT vote, COUNT(id) AS count FROM votes GROUP BY vote
+ERROR:  relation "votes" does not exist at character 38
+STATEMENT:  SELECT vote, COUNT(id) AS count FROM votes GROUP BY vote
+[root@ip-172-31-17-193 k8s-specifications]#
+
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs result-5d57b59f4b-lxgcx
+Tue, 16 May 2023 10:47:40 GMT body-parser deprecated bodyParser: use individual json/urlencoded middlewares at server.js:73:9
+Tue, 16 May 2023 10:47:40 GMT body-parser deprecated undefined extended: provide extended option at ../node_modules/body-parser/index.js:104:29
+App running on port 80
+Connected to db
+Error performing query: error: relation "votes" does not exist
+Error performing query: error: relation "votes" does not exist
+Error performing query: error: relation "votes" does not exist
+[root@ip-172-31-17-193 k8s-specifications]#
+
+
+[root@ip-172-31-17-193 k8s-specifications]# kubectl logs redis-868d64d78-q8lbf
+1:C 16 May 2023 10:25:12.928 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+1:C 16 May 2023 10:25:12.929 # Redis version=7.0.11, bits=64, commit=00000000, modified=0, pid=1, just started
+1:C 16 May 2023 10:25:12.929 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf
+1:M 16 May 2023 10:25:12.929 * monotonic clock: POSIX clock_gettime
+1:M 16 May 2023 10:25:12.930 * Running mode=standalone, port=6379.
+1:M 16 May 2023 10:25:12.930 # Server initialized
+1:M 16 May 2023 10:25:12.934 # WARNING Your system is configured to use the 'xen' clocksource which might lead to degraded performance. Check the result of the [slow-clocksource] system check: run 'redis-server --check-system' to check if the system's clocksource isn't degrading performance.
+1:M 16 May 2023 10:25:12.934 * Ready to accept connections
+[root@ip-172-31-17-193 k8s-specifications]#
